@@ -1,0 +1,94 @@
+diff -ubwrN ./work-orig/http_ping/http_ping.c ./work/http_ping/http_ping.c
+--- ./work-orig/http_ping/http_ping.c	2005-05-20 21:10:23.000000000 +0200
++++ ./work/http_ping/http_ping.c	2017-01-11 08:01:53.533573000 +0100
+@@ -1,6 +1,6 @@
+ /* http_ping - measure HTTP latency
+ **
+-** Copyright © 1998,1999,2001,2002 by Jef Poskanzer <jef@mail.acme.com>.
++** Copyright ï¿½ 1998,1999,2001,2002 by Jef Poskanzer <jef@mail.acme.com>.
+ ** All rights reserved.
+ **
+ ** Redistribution and use in source and binary forms, with or without
+@@ -150,6 +150,13 @@
+     interval = INTERVAL;
+     quiet = 0;
+     do_proxy = 0;
++
++    int bw_test = 0;
++    unsigned int dl_bytes = 0;
++    float dl_time = 0;
++    float dl_speed = 0;
++    int min_dl_data = 100000;
++
+     while ( argn < argc && argv[argn][0] == '-' && argv[argn][1] != '\0' )
+ 	{
+ 	if ( strncmp( argv[argn], "-count", strlen( argv[argn] ) ) == 0 && argn + 1 < argc )
+@@ -188,6 +195,10 @@
+ 		*colon = '\0';
+ 		}
+ 	    }
++  else if(strncmp( argv[argn], "-bw", strlen( argv[argn] ) ) == 0)
++  {
++    bw_test = 1;
++  }
+ 	else
+ 	    usage();
+ 	++argn;
+@@ -229,6 +240,12 @@
+     (void) signal( SIGALRM, handle_alarm );
+ #endif /* HAVE_SIGSET */
+ 
++  if(bw_test == 1)
++  {
++    printf("Bandwidth test started...\n");
++    interval = 0;
++  }
++
+     /* Main loop. */
+     terminate = 0;
+     for (;;)
+@@ -257,7 +274,9 @@
+ 		    delta_timeval( &connect_at, &response_at ) / 1000.0;
+ 		elapsed_data =
+ 		    delta_timeval( &response_at, &finished_at ) / 1000.0;
+-		if ( ! quiet )
++    dl_bytes += bytes;
++    dl_time += elapsed_data;
++		if ( ! quiet && !bw_test)
+ 		    (void) printf(
+ 			"%ld bytes from %s: %g ms (%gc/%gr/%gd)\n",
+ 			bytes, url, elapsed_total, elapsed_connect,
+@@ -277,11 +296,23 @@
+ 		}
+ 	    }
+ 	alarm( 0 );
+-	if ( count == 0 || terminate )
++	if ( (count == 0 || terminate) && !bw_test )
+ 	    break;
++  if(dl_bytes > min_dl_data && bw_test)
++  {
++    break;
++  }
+ 	sleep( interval );
+ 	}
+-
++  if(bw_test)
++  {
++    dl_speed = dl_bytes/dl_time;
++    printf("--- %s http_ping Download bandwidth statistics ---\n", url);
++    printf("Downloaded %i bytes in %f ms\n", dl_bytes, dl_time);
++    printf("Download Speed: %f KB/s\n",dl_speed);
++  }
++  else
++  {
+     /* Report statistics. */
+     (void) printf( "\n" );
+     (void) printf( "--- %s http_ping statistics ---\n", url );
+@@ -305,6 +336,7 @@
+ 	    "data     min/avg/max = %g/%g/%g ms\n",
+ 	    min_data, sum_data / count_completed, max_data );
+ 	}
++  }
+ 
+     /* Done. */
+ #ifdef USE_SSL
